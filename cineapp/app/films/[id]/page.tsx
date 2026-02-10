@@ -23,19 +23,33 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
   let film, credits, videos;
 
   try {
-    [film, credits, videos] = await Promise.all([
-      filmsAPI.getMovieDetails(parseInt(id)),
-      filmsAPI.getMovieCredits(parseInt(id)),
-      filmsAPI.getMovieVideos(parseInt(id)),
-    ]);
+    // Récupération des données avec gestion d'erreurs individuelles
+    const filmResponse = await filmsAPI.getMovieDetails(parseInt(id));
+    
+    // Données optionnelles avec fallback
+    const creditsResponse = await filmsAPI.getMovieCredits(parseInt(id)).catch(() => ({ 
+      cast: [], 
+      crew: [], 
+      directors: [], 
+      writers: [] 
+    }));
+    
+    const videosResponse = await filmsAPI.getMovieVideos(parseInt(id)).catch(() => []);
+    
+    [film, credits, videos] = [filmResponse, creditsResponse, videosResponse];
   } catch (error) {
     console.error('Erreur chargement film:', error);
     notFound();
   }
 
-  const posterUrl = film.images.poster_large || '/placeholder-film.jpg';
-  const backdropUrl = film.images.backdrop_large || posterUrl;
-  const trailers = videos.filter(v => v.type === 'Trailer' && v.site === 'YouTube');
+  // Gestion des URLs d'images avec fallback
+  const posterUrl = film.images?.poster_large || film.poster || '/placeholder-film.jpg';
+  const backdropUrl = film.images?.backdrop_large || film.backdrop || posterUrl;
+  
+  // Gestion des vidéos avec vérification de sécurité
+  const trailers = (videos as any[])?.filter(v => v.type === 'Trailer' && v.site === 'YouTube') || [];
+  
+  // Gestion du runtime
   const runtime = film.runtime ? `${Math.floor(film.runtime / 60)}h ${film.runtime % 60}min` : null;
 
   return (
@@ -64,6 +78,22 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
       </div>
 
       <div className="container mx-auto px-4 pb-12">
+        {/* Message d'avertissement si données manquantes */}
+        {(!(credits as any)?.cast?.length || !trailers?.length) && (
+          <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <span className="text-blue-500 text-2xl">ℹ️</span>
+              </div>
+              <div className="ml-3">
+                <p className="text-blue-700">
+                  Certaines informations peuvent être manquantes ou en cours de chargement.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Colonne gauche - Poster et bouton */}
           <div className="md:col-span-1">
@@ -93,14 +123,14 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
                   </div>
                 )}
                 
-                {film.production_countries.length > 0 && (
+                {(film as any).production_countries?.length > 0 && (
                   <div>
                     <span className="text-gray-500 text-sm">Pays</span>
-                    <p className="font-semibold">{film.production_countries.join(', ')}</p>
+                    <p className="font-semibold">{(film as any).production_countries.join(', ')}</p>
                   </div>
                 )}
 
-                {film.budget > 0 && (
+                {(film as any).budget && (film as any).budget > 0 && (
                   <div>
                     <span className="text-gray-500 text-sm">Budget</span>
                     <p className="font-semibold">
@@ -108,12 +138,12 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
                         style: 'currency',
                         currency: 'USD',
                         maximumFractionDigits: 0,
-                      }).format(film.budget)}
+                      }).format((film as any).budget)}
                     </p>
                   </div>
                 )}
 
-                {film.revenue > 0 && (
+                {(film as any).revenue && (film as any).revenue > 0 && (
                   <div>
                     <span className="text-gray-500 text-sm">Recettes</span>
                     <p className="font-semibold">
@@ -121,7 +151,7 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
                         style: 'currency',
                         currency: 'USD',
                         maximumFractionDigits: 0,
-                      }).format(film.revenue)}
+                      }).format((film as any).revenue)}
                     </p>
                   </div>
                 )}
@@ -165,11 +195,11 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
             </div>
 
             {/* Genres */}
-            {film.genres.length > 0 && (
+            {(film as any).genres?.length > 0 && (
               <div className="bg-white rounded-lg p-6 shadow-md">
                 <h2 className="text-2xl font-bold mb-4">Genres</h2>
                 <div className="flex flex-wrap gap-2">
-                  {film.genres.map((genre) => (
+                  {(film as any).genres.map((genre: any) => (
                     <span
                       key={genre.id}
                       className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md"
@@ -192,15 +222,15 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
             )}
 
             {/* Réalisateurs et Scénaristes */}
-            {(credits.directors.length > 0 || credits.writers.length > 0) && (
+            {((credits as any)?.directors?.length > 0 || (credits as any)?.writers?.length > 0) && (
               <div className="bg-white rounded-lg p-6 shadow-md">
                 <h2 className="text-2xl font-bold mb-4">Équipe créative</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {credits.directors.length > 0 && (
+                  {(credits as any)?.directors?.length > 0 && (
                     <div>
                       <h3 className="font-semibold text-gray-600 mb-2">Réalisation</h3>
                       <div className="space-y-2">
-                        {credits.directors.map((director) => (
+                        {(credits as any).directors.map((director: any) => (
                           <div key={director.id} className="flex items-center gap-3">
                             {director.profile_image && (
                               <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
@@ -219,11 +249,11 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
                     </div>
                   )}
 
-                  {credits.writers.length > 0 && (
+                  {(credits as any)?.writers?.length > 0 && (
                     <div>
                       <h3 className="font-semibold text-gray-600 mb-2">Scénario</h3>
                       <div className="space-y-2">
-                        {credits.writers.slice(0, 3).map((writer) => (
+                        {(credits as any).writers.slice(0, 3).map((writer: any) => (
                           <div key={writer.id} className="flex items-center gap-3">
                             {writer.profile_image && (
                               <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
@@ -246,11 +276,11 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
             )}
 
             {/* Casting */}
-            {credits.cast.length > 0 && (
+            {(credits as any)?.cast?.length > 0 && (
               <div className="bg-white rounded-lg p-6 shadow-md">
                 <h2 className="text-2xl font-bold mb-6">Distribution</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-                  {credits.cast.slice(0, 12).map((actor) => (
+                  {(credits as any).cast.slice(0, 12).map((actor: any) => (
                     <div key={actor.id} className="text-center group">
                       <div className="relative aspect-[2/3] mb-3 rounded-lg overflow-hidden shadow-md group-hover:shadow-xl transition-shadow">
                         {actor.profile_image ? (
@@ -277,14 +307,14 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
             )}
 
             {/* Bandes annonces */}
-            {trailers.length > 0 && (
+            {trailers?.length > 0 && (
               <div className="bg-white rounded-lg p-6 shadow-md">
                 <h2 className="text-2xl font-bold mb-4">Bandes-annonces</h2>
                 <div className="space-y-4">
                   <div className="aspect-video rounded-lg overflow-hidden shadow-lg">
                     <iframe
                       src={`https://www.youtube.com/embed/${trailers[0].key}`}
-                      title={trailers[0].name}
+                      title={trailers[0].name as string}
                       className="w-full h-full"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
@@ -293,7 +323,7 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
                   
                   {trailers.length > 1 && (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      {trailers.slice(1, 4).map((video) => (
+                      {trailers.slice(1, 4).map((video: any) => (
                         <a
                           key={video.id}
                           href={`https://www.youtube.com/watch?v=${video.key}`}
@@ -322,28 +352,30 @@ export default async function FilmDetailsPage({ params }: { params: Promise<{ id
             )}
 
             {/* Liens externes */}
-            <div className="flex gap-4">
-              {film.homepage && (
-                <a
-                  href={film.homepage}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 bg-gray-800 text-white text-center py-3 rounded-lg font-semibold hover:bg-gray-900 transition-colors"
-                >
-                  🌐 Site officiel
-                </a>
-              )}
-              {film.imdb_id && (
-                <a
-                  href={`https://www.imdb.com/title/${film.imdb_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 bg-yellow-400 text-black text-center py-3 rounded-lg font-semibold hover:bg-yellow-500 transition-colors"
-                >
-                  IMDb
-                </a>
-              )}
-            </div>
+            {(film.homepage || (film as any).imdb_id) && (
+              <div className="flex gap-4">
+                {film.homepage && (
+                  <a
+                    href={film.homepage}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-gray-800 text-white text-center py-3 rounded-lg font-semibold hover:bg-gray-900 transition-colors"
+                  >
+                    🌐 Site officiel
+                  </a>
+                )}
+                {(film as any).imdb_id && (
+                  <a
+                    href={`https://www.imdb.com/title/${(film as any).imdb_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-yellow-400 text-black text-center py-3 rounded-lg font-semibold hover:bg-yellow-500 transition-colors"
+                  >
+                    IMDb
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
