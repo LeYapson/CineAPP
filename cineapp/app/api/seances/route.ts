@@ -15,9 +15,10 @@ export async function GET(request: NextRequest) {
     });
 
     if (!res.ok) {
+      console.error(`Erreur micro-service séances: ${res.status}`);
       return NextResponse.json(
-        { error: `Erreur micro-service séances: ${res.status}` },
-        { status: res.status }
+        { error: 'Le service des séances est temporairement indisponible' },
+        { status: 502 }
       );
     }
 
@@ -51,9 +52,10 @@ export async function POST(request: NextRequest) {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
+      console.error(`Erreur création séance: ${res.status}`, text);
       return NextResponse.json(
-        { error: text || `Erreur création séance: ${res.status}` },
-        { status: res.status }
+        { error: 'Impossible de créer la séance. Le service est temporairement indisponible.' },
+        { status: 502 }
       );
     }
 

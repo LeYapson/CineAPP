@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     if (!seanceId || !movieTitle || !salle || !horaire || !nbPlaces || !seats || !total) {
       return NextResponse.json(
-        { error: 'Champs manquants : seanceId, movieTitle, salle, horaire, nbPlaces, seats, total' },
+        { error: 'Données de réservation incomplètes' },
         { status: 400 }
       );
     }
@@ -77,8 +77,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(reservation, { status: 201 });
   } catch (err) {
+    console.error('Erreur création réservation:', err);
     return NextResponse.json(
-      { error: (err as Error).message || 'Erreur lors de la création' },
+      { error: 'Une erreur est survenue lors de la création de la réservation' },
       { status: 500 }
     );
   }

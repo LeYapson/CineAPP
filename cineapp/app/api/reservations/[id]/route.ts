@@ -32,7 +32,17 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const deleted = await deleteReservation(userId, id);
+
+  let deleted: boolean;
+  try {
+    deleted = await deleteReservation(userId, id);
+  } catch (err) {
+    console.error('Erreur suppression réservation:', err);
+    return NextResponse.json(
+      { error: 'Une erreur est survenue lors de la suppression' },
+      { status: 500 }
+    );
+  }
 
   if (!deleted) {
     return NextResponse.json({ error: 'Réservation introuvable' }, { status: 404 });

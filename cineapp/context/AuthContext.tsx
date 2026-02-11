@@ -113,14 +113,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(userData);
       setAccessToken(response.accessToken);
       
-      // Redirection vers la page d'accueil ou la page précédente
-      router.push('/');
-      
+      // Ne pas rediriger ici — laisser le composant appelant (LoginForm) gérer la redirection
     } catch (err) {
       const error = err as Error;
       console.error('Erreur complète de connexion:', err);
       setError(error.message || 'Identifiants incorrects. Veuillez réessayer.');
-      // Ne pas throw l'erreur ici pour éviter les doublons dans les logs
+      throw err; // Relancer pour que LoginForm puisse réagir
     } finally {
       setLoading(false);
     }

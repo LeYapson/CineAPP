@@ -33,7 +33,13 @@ export default function LoginForm() {
       }
     } catch (err) {
       const error = err as Error;
-      setError(error.message || 'Identifiants incorrects. Veuillez réessayer.');
+      const msg = error.message || '';
+      // Message générique si le service est injoignable
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('contacter le serveur') || msg.includes('réseau')) {
+        setError('Le service d\'authentification est temporairement indisponible. Veuillez réessayer ultérieurement.');
+      } else {
+        setError(msg || 'Identifiants incorrects. Veuillez réessayer.');
+      }
     } finally {
       setLoading(false);
     }
@@ -90,13 +96,7 @@ export default function LoginForm() {
           <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
           </svg>
-          <span>
-            {error.includes('Invalid credentials') || error.includes('Identifiants incorrects')
-              ? 'Nom d\'utilisateur ou mot de passe incorrect.'
-              : error.includes('réseau') || error.includes('serveur')
-              ? 'Problème de connexion au serveur.'
-              : error}
-          </span>
+          <span>{error}</span>
         </div>
       )}
 

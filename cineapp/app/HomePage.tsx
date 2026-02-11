@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { filmsAPI } from '@/lib/api/films';
 import { motion } from 'framer-motion';
+import ServiceUnavailable from '@/components/ui/ServiceUnavailable';
 
 export default function HomePage() {
   const [popularMovies, setPopularMovies] = useState<any[]>([]);
@@ -165,15 +166,11 @@ export default function HomePage() {
               ))}
             </div>
           ) : error ? (
-            <div className="text-center py-12">
-              <p className="text-[hsl(var(--danger))] mb-4">{error}</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-5 py-2.5 bg-[hsl(var(--danger))] text-white rounded-xl font-medium hover:brightness-110 transition-all"
-              >
-                Réessayer
-              </button>
-            </div>
+            <ServiceUnavailable
+              feature="les films populaires"
+              onRetry={() => window.location.reload()}
+              compact
+            />
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {popularMovies.map((movie, index) => (

@@ -42,7 +42,8 @@ export default function SeatSelector({ seanceId, movieId }: SeatSelectorProps) {
         if (!found) throw new Error('Séance introuvable');
         setSeance(found);
       } catch (err) {
-        setError((err as Error).message || 'Erreur lors du chargement');
+        console.error('Erreur chargement séance:', err);
+        setError('Le service de réservation est temporairement indisponible. Veuillez réessayer ultérieurement.');
       } finally {
         setLoading(false);
       }
@@ -161,7 +162,8 @@ export default function SeatSelector({ seanceId, movieId }: SeatSelectorProps) {
         `/reservations/confirmation?seanceId=${seance.id}&seats=${nbPlaces}&movieTitle=${encodeURIComponent(movieTitle)}&salle=${seance.numeroSalle}&horaire=${encodeURIComponent(seance.horaire)}&ref=${reference}&selectedSeats=${encodeURIComponent(seatsArray.join(','))}`
       );
     } catch (err) {
-      setError((err as Error).message || 'Erreur lors de la réservation');
+      console.error('Erreur réservation:', err);
+      setError('La réservation n\u2019a pas pu être effectuée. Le service est temporairement indisponible.');
       setReserving(false);
     }
   };
@@ -197,8 +199,17 @@ export default function SeatSelector({ seanceId, movieId }: SeatSelectorProps) {
   if (error && !seance) {
     return (
       <div className="max-w-md mx-auto px-4 py-10">
-        <div className="rounded-2xl border border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.05)] p-6 text-center">
-          <p className="text-[hsl(var(--fg))] font-medium mb-4">{error}</p>
+        <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] p-6 text-center space-y-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl
+            bg-[hsl(var(--warning,40_100%_50%)/0.1)] text-[hsl(var(--warning,40_100%_50%))] mx-auto">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-[hsl(var(--fg))] font-semibold mb-1">Service en maintenance</p>
+            <p className="text-sm text-[hsl(var(--fg-muted))]">Le service de réservation est temporairement indisponible. Veuillez réessayer dans quelques instants.</p>
+          </div>
           <div className="flex gap-3 justify-center">
             <button onClick={() => router.push('/films')}
               className="px-4 py-2 bg-[hsl(var(--accent))] text-[hsl(var(--accent-fg))] rounded-xl text-sm font-medium hover:brightness-110 transition-all">
@@ -329,8 +340,8 @@ export default function SeatSelector({ seanceId, movieId }: SeatSelectorProps) {
 
           {/* Erreur */}
           {error && (
-            <div className="rounded-xl border border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.05)] p-3 text-center">
-              <p className="text-sm text-[hsl(var(--danger))]">{error}</p>
+            <div className="rounded-xl border border-[hsl(var(--warning,40_100%_50%)/0.3)] bg-[hsl(var(--warning,40_100%_50%)/0.05)] p-3 text-center">
+              <p className="text-sm text-[hsl(var(--fg-muted))]">Le service est temporairement indisponible. Veuillez réessayer.</p>
             </div>
           )}
         </div>

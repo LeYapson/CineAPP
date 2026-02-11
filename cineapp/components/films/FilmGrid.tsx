@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { filmsAPI, Film } from '@/lib/api/films';
 import FilmCard from './FilmCard';
+import ServiceUnavailable from '@/components/ui/ServiceUnavailable';
 
 interface FilmGridProps {
   category?: 'popular' | 'top-rated' | 'now-playing' | 'upcoming';
@@ -61,22 +62,11 @@ export default function FilmGrid({
 
   if (error) {
     return (
-      <div className="text-center py-16">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl
-          bg-[hsl(var(--danger)/0.1)] text-[hsl(var(--danger))] mb-4">
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-        </div>
-        <p className="text-[hsl(var(--fg-muted))] text-lg mb-4">{error}</p>
-        <button 
-          onClick={() => loadFilms()} 
-          className="px-6 py-2.5 bg-[hsl(var(--accent))] text-[hsl(var(--accent-fg))] rounded-xl font-medium
-            hover:brightness-110 transition-all"
-        >
-          Réessayer
-        </button>
-      </div>
+      <ServiceUnavailable
+        feature="le catalogue de films"
+        onRetry={() => loadFilms()}
+        compact
+      />
     );
   }
 

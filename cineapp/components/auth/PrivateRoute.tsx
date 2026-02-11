@@ -37,7 +37,7 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <p className="text-[hsl(var(--fg))] font-medium mb-4">{error}</p>
+          <p className="text-[hsl(var(--fg))] font-medium mb-4">Votre session a expiré ou le service est temporairement indisponible.</p>
           <button
             onClick={() => router.push('/login')}
             className="px-5 py-2.5 bg-[hsl(var(--accent))] text-[hsl(var(--accent-fg))] rounded-xl font-medium

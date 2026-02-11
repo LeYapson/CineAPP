@@ -30,9 +30,10 @@ export async function POST(
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
+      console.error(`Erreur réservation séance ${id}: ${res.status}`, text);
       return NextResponse.json(
-        { error: text || `Erreur réservation: ${res.status}` },
-        { status: res.status }
+        { error: 'La réservation n\u2019a pas pu être effectuée. Veuillez réessayer.' },
+        { status: 502 }
       );
     }
 

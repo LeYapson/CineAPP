@@ -28,7 +28,8 @@ export default function TimeSlotSelector({ movieId, movieTitle, posterUrl }: Tim
         const data = await seancesAPI.getOrCreateSeancesByFilm(movieId);
         setSeances(data);
       } catch (err) {
-        setError((err as Error).message || 'Impossible de charger les séances');
+        console.error('Erreur chargement séances:', err);
+        setError('Le service des séances est temporairement indisponible. Veuillez réessayer ultérieurement.');
       } finally {
         setLoading(false);
       }
@@ -124,8 +125,8 @@ export default function TimeSlotSelector({ movieId, movieTitle, posterUrl }: Tim
             </div>
           ) : error ? (
             <div className="rounded-2xl border border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.05)] p-6 text-center">
-              <p className="text-[hsl(var(--fg))] font-medium mb-2">Impossible de charger les séances</p>
-              <p className="text-sm text-[hsl(var(--fg-muted))] mb-4">{error}</p>
+              <p className="text-[hsl(var(--fg))] font-medium mb-2">Service temporairement indisponible</p>
+              <p className="text-sm text-[hsl(var(--fg-muted))] mb-4">Le service des séances est en maintenance. Veuillez réessayer dans quelques instants.</p>
               <button
                 onClick={() => window.location.reload()}
                 className="px-4 py-2 bg-[hsl(var(--accent))] text-[hsl(var(--accent-fg))] rounded-xl text-sm font-medium hover:brightness-110 transition-all"
