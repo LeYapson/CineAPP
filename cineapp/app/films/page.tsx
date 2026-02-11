@@ -14,9 +14,8 @@ interface FilmsPageProps {
 }
 
 export default async function FilmsPage({ searchParams }: FilmsPageProps) {
-  const { category = 'popular' } = await searchParams; // Await searchParams
+  const { category = 'popular' } = await searchParams;
   
-  // Charger les films côté serveur pour le SEO
   let initialData;
   let title = 'Films Populaires';
   let description = 'Découvrez les films les plus populaires du moment';
@@ -43,43 +42,43 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
     }
   } catch (error) {
     console.error('Erreur chargement films:', error);
-    // Fallback avec données vides
     initialData = { results: [], page: 1, total_pages: 0, total_results: 0 };
   }
 
+  const categories = [
+    { key: 'popular', label: 'Populaires', icon: '🔥' },
+    { key: 'now-playing', label: 'Au cinéma', icon: '🎬' },
+    { key: 'top-rated', label: 'Mieux notés', icon: '⭐' },
+    { key: 'upcoming', label: 'Prochainement', icon: '📅' },
+  ];
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Filtres de catégories */}
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-4">{title}</h1>
-        <p className="text-gray-600 mb-6">{description}</p>
-        
-        <div className="flex flex-wrap gap-3">
-          <CategoryButton 
-            href="/films?category=popular" 
-            active={category === 'popular'}
-          >
-            Populaires
-          </CategoryButton>
-          <CategoryButton 
-            href="/films?category=now-playing" 
-            active={category === 'now-playing'}
-          >
-            Au cinéma
-          </CategoryButton>
-          <CategoryButton 
-            href="/films?category=top-rated" 
-            active={category === 'top-rated'}
-          >
-            Mieux notés
-          </CategoryButton>
-          <CategoryButton 
-            href="/films?category=upcoming" 
-            active={category === 'upcoming'}
-          >
-            Prochainement
-          </CategoryButton>
-        </div>
+        <h1 className="text-3xl font-bold text-[hsl(var(--fg))] mb-2">{title}</h1>
+        <p className="text-[hsl(var(--fg-muted))]">{description}</p>
+      </div>
+
+      {/* Category pills */}
+      <div className="flex flex-wrap gap-2 mb-8">
+        {categories.map((cat) => {
+          const isActive = category === cat.key;
+          return (
+            <a
+              key={cat.key}
+              href={`/films?category=${cat.key}`}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? 'bg-[hsl(var(--accent)/0.15)] text-[hsl(var(--accent))] shadow-sm'
+                  : 'bg-[hsl(var(--bg-card))] text-[hsl(var(--fg-muted))] border border-[hsl(var(--border))] hover:bg-[hsl(var(--bg-card-hover))] hover:text-[hsl(var(--fg))] hover:border-[hsl(var(--border-hover))]'
+              }`}
+            >
+              <span>{cat.icon}</span>
+              {cat.label}
+            </a>
+          );
+        })}
       </div>
 
       <Suspense fallback={<FilmGridSkeleton />}>
@@ -89,37 +88,14 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
   );
 }
 
-function CategoryButton({ 
-  href, 
-  active, 
-  children 
-}: { 
-  href: string; 
-  active: boolean; 
-  children: React.ReactNode;
-}) {
-  return (
-    <a
-      href={href}
-      className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-        active
-          ? 'bg-blue-600 text-white'
-          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-      }`}
-    >
-      {children}
-    </a>
-  );
-}
-
 function FilmGridSkeleton() {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
       {[...Array(10)].map((_, i) => (
-        <div key={i} className="animate-pulse">
-          <div className="bg-gray-300 aspect-[2/3] rounded-lg mb-4"></div>
-          <div className="h-4 bg-gray-300 rounded mb-2"></div>
-          <div className="h-3 bg-gray-300 rounded w-2/3"></div>
+        <div key={i} className="space-y-3">
+          <div className="skeleton aspect-[2/3] rounded-xl" />
+          <div className="skeleton h-4 w-3/4 rounded" />
+          <div className="skeleton h-3 w-1/2 rounded" />
         </div>
       ))}
     </div>

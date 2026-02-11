@@ -1,26 +1,201 @@
 @import "tailwindcss";
 
+/* ============================================
+   CineAPP Design System
+   Thème piloté par data-theme (jamais par prefers-color-scheme)
+   ============================================ */
+
+/* ── Palette de base ── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Accent principal – or cinéma */
+  --accent: 45 93% 58%;
+  --accent-fg: 0 0% 10%;
+  /* Accent secondaire – bleu vif */
+  --primary: 220 90% 56%;
+  --primary-fg: 0 0% 100%;
+  /* Feedback */
+  --success: 152 69% 41%;
+  --warning: 38 92% 50%;
+  --danger: 0 84% 60%;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ── Thème SOMBRE (par défaut) ── */
+[data-theme="dark"] {
+  --bg: 222 47% 6%;
+  --bg-elevated: 222 40% 10%;
+  --bg-card: 222 35% 14%;
+  --bg-card-hover: 222 30% 18%;
+  --bg-subtle: 222 25% 20%;
+  --fg: 210 40% 96%;
+  --fg-muted: 215 20% 65%;
+  --fg-subtle: 215 15% 45%;
+  --border: 215 20% 22%;
+  --border-hover: 215 20% 32%;
+  --ring: 220 90% 56%;
+  --overlay: 222 47% 4% / 0.8;
+  --shadow-color: 222 47% 4%;
+  --input-bg: 222 35% 12%;
+  /* overrides for better contrast on dark bg */
+  --primary: 220 90% 50%;
+  --primary-text: 217 91% 72%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Thème CLAIR ── */
+[data-theme="light"] {
+  --bg: 210 20% 98%;
+  --bg-elevated: 0 0% 100%;
+  --bg-card: 0 0% 100%;
+  --bg-card-hover: 210 20% 96%;
+  --bg-subtle: 210 20% 94%;
+  --fg: 222 47% 11%;
+  --fg-muted: 215 16% 47%;
+  --primary-text: 220 90% 45%;
+  --fg-subtle: 215 12% 62%;
+  --border: 214 32% 91%;
+  --border-hover: 214 25% 80%;
+  --ring: 220 90% 56%;
+  --overlay: 0 0% 0% / 0.4;
+  --shadow-color: 214 32% 80%;
+  --input-bg: 210 20% 96%;
+}
+
+/* ── Application globale ── */
+* {
+  border-color: hsl(var(--border));
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: hsl(var(--bg));
+  color: hsl(var(--fg));
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar personnalisée ── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--bg-elevated));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--fg-subtle));
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--fg-muted));
+}
+
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.fade-in      { animation: fadeIn 0.4s ease-out; }
+.slide-up     { animation: slideUp 0.5s ease-out; }
+
+/* ── Skeleton loader ── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--bg-subtle)) 25%,
+    hsl(var(--bg-card-hover)) 50%,
+    hsl(var(--bg-subtle)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+/* ── Hover de carte ── */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px -8px hsl(var(--shadow-color) / 0.3);
+}
+
+/* ── Inputs globaux ── */
+input, textarea, select {
+  background-color: hsl(var(--input-bg));
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--fg));
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+}
+input::placeholder, textarea::placeholder {
+  color: hsl(var(--fg-subtle));
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.15);
+}
+
+/* ── Liens globaux ── */
+a {
+  color: hsl(var(--primary));
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+a:hover {
+  color: hsl(220 90% 46%);
+}
+
+/* ── Badges ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.badge-success { background: hsl(var(--success)); color: white; }
+.badge-warning { background: hsl(var(--warning)); color: white; }
+.badge-danger  { background: hsl(var(--danger));  color: white; }
+
+/* ── Texte gradient ── */
+.text-gradient {
+  background: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--primary)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Focus visible global ── */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  body { font-size: 14px; }
+  h1 { font-size: 2rem !important; }
+  h2 { font-size: 1.5rem !important; }
+}
+
+/* ── Classes utilitaires custom ── */
+.glass {
+  background: hsl(var(--bg-elevated) / 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }

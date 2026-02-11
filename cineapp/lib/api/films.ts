@@ -94,24 +94,47 @@ class FilmsAPI {
   private async fetchAPI<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
     const url = new URL(`${this.baseURL}${endpoint}`);
     
+    console.log(`Appel API Films: ${url.toString()}`);
+    
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         url.searchParams.append(key, value);
       });
     }
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      next: { revalidate: 3600 }, // Cache for 1 hour
-    });
+    try {
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        next: { revalidate: 3600 }, // Cache for 1 hour
+      });
 
-    if (!response.ok) {
-      throw new Error(`Erreur API Films: ${response.status}`);
+      console.log(`Réponse API Films: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        try {
+          const errorData = await response.json();
+          console.error('Erreur API Films - Données:', errorData);
+          throw new Error(errorData.message || errorData.error || `Erreur API Films: ${response.status}`);
+        } catch (e) {
+          const textError = await response.text().catch(() => response.statusText);
+          throw new Error(`Erreur API Films: ${response.status} - ${textError}`);
+        }
+      }
+
+      const data = await response.json();
+      console.log('Données films reçues:', data);
+      return data;
+    } catch (error) {
+      console.error('Erreur réseau complète pour les films:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          throw new Error('Impossible de contacter le serveur des films. Veuillez vérifier votre connexion réseau.');
+        }
+      }
+      throw new Error(`Erreur de chargement des films: ${error instanceof Error ? error.message : String(error)}`);
     }
-
-    return response.json();
   }
 
   async getPopularMovies(page: number = 1, language: string = 'fr-FR'): Promise<FilmListResponse> {

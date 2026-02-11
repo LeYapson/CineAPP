@@ -38,44 +38,107 @@ class AuthAPI {
 
   private async fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
+    console.log(`Appel API: ${options.method || 'GET'} ${url}`);
     
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+        credentials: 'include', // Ajouter pour gérer les cookies si nécessaire
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Erreur API Auth: ${response.status}`);
+      console.log(`Réponse API: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        // Gestion spécifique pour les erreurs 401
+        if (response.status === 401) {
+          try {
+            const errorData = await response.json();
+            console.error('Erreur 401 - Données d\'erreur:', errorData);
+            // Message spécifique pour les credentials invalides
+            if (errorData.message && errorData.message.includes('Invalid credentials')) {
+              throw new Error('Nom d\'utilisateur ou mot de passe incorrect');
+            } else if (errorData.error && errorData.error.includes('invalid')) {
+              throw new Error('Identifiants incorrects');
+            } else {
+              throw new Error(errorData.message || errorData.error || 'Authentification échouée');
+            }
+          } catch (e) {
+            // Si on ne peut pas parser le JSON pour une erreur 401
+            throw new Error('Nom d\'utilisateur ou mot de passe incorrect');
+          }
+        }
+        
+        try {
+          const errorData = await response.json();
+          console.error('Données d\'erreur du backend:', errorData);
+          // Vérifier si le backend retourne un message d'erreur spécifique
+          if (errorData.message) {
+            throw new Error(errorData.message);
+          } else if (errorData.error) {
+            throw new Error(errorData.error);
+          } else if (errorData.detail) {
+            throw new Error(errorData.detail);
+          } else {
+            throw new Error(`Erreur API Auth: ${response.status}`);
+          }
+        } catch (e) {
+          // Si on ne peut pas parser le JSON, utiliser un message générique
+          const textError = await response.text().catch(() => response.statusText);
+          throw new Error(`Erreur API Auth: ${response.status} - ${textError}`);
+        }
+      }
+
+      const data = await response.json();
+      console.log('Données de réponse:', data);
+      return data;
+    } catch (error) {
+      console.error('Erreur réseau complète:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Impossible de contacter le serveur. Veuillez vérifier votre connexion réseau.');
+        } else if (error.message.includes('NetworkError')) {
+          throw new Error('Problème de réseau. Veuillez vérifier votre connexion.');
+        }
+      }
+      throw new Error(`Erreur réseau: ${error instanceof Error ? error.message : String(error)}`);
     }
-
-    return response.json();
   }
 
   async login(credentials: { username: string; password: string }): Promise<LoginResponse> {
-    const response = await this.fetchAPI<RegisterResponse>('/api/v1/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-    });
+    console.log('Tentative de connexion avec:', credentials.username);
     
-    // Normaliser la réponse pour utiliser accessToken/refreshToken
-    const normalizedResponse = {
-      ...response,
-      accessToken: response.access_token || response.accessToken || response.token,
-      refreshToken: response.refresh_token || response.refreshToken || response.token,
-      user: response.user || null,
-    };
-    
-    // Vérifier que la réponse normalisée contient bien les tokens
-    if (!normalizedResponse.accessToken || !normalizedResponse.refreshToken) {
-      console.error('Réponse du backend login:', response);
-      throw new Error('Réponse de connexion invalide - tokens manquants. Format attendu: {access_token, refresh_token}');
+    try {
+      const response = await this.fetchAPI<RegisterResponse>('/api/v1/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+      });
+      
+      console.log('Réponse brute du backend:', response);
+      
+      // Normaliser la réponse pour utiliser accessToken/refreshToken
+      const normalizedResponse = {
+        ...response,
+        accessToken: response.access_token || response.accessToken || response.token,
+        refreshToken: response.refresh_token || response.refreshToken || response.token,
+        user: response.user || null,
+      };
+      
+      // Vérifier que la réponse normalisée contient bien les tokens
+      if (!normalizedResponse.accessToken || !normalizedResponse.refreshToken) {
+        console.error('Réponse du backend login:', response);
+        throw new Error('Réponse de connexion invalide - tokens manquants. Format attendu: {access_token, refresh_token}');
+      }
+      
+      console.log('Connexion réussie, tokens obtenus');
+      return normalizedResponse as LoginResponse;
+    } catch (error) {
+      console.error('Erreur détaillée de connexion:', error);
+      throw error;
     }
-    
-    return normalizedResponse as LoginResponse;
   }
 
   async register(userData: {

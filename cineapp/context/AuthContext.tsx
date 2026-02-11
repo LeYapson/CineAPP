@@ -93,8 +93,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
 
+      console.log('Début de la tentative de connexion pour:', username);
       const response = await authAPI.login({ username, password });
       
+      console.log('Tokens reçus:', {
+        accessToken: response.accessToken ? '****' : 'null',
+        refreshToken: response.refreshToken ? '****' : 'null'
+      });
+
       // Stockage sécurisé des tokens
       // Utiliser les tokens normalisés (accessToken/refreshToken)
       localStorage.setItem('accessToken', response.accessToken);
@@ -103,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Récupérer les informations utilisateur
       const userData = await authAPI.getCurrentUser(response.accessToken);
       
+      console.log('Données utilisateur récupérées:', userData);
       setUser(userData);
       setAccessToken(response.accessToken);
       
@@ -111,9 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
     } catch (err) {
       const error = err as Error;
+      console.error('Erreur complète de connexion:', err);
       setError(error.message || 'Identifiants incorrects. Veuillez réessayer.');
-      console.error('Erreur de connexion:', err);
-      throw error;
+      // Ne pas throw l'erreur ici pour éviter les doublons dans les logs
     } finally {
       setLoading(false);
     }

@@ -24,7 +24,6 @@ export default function FilmGrid({
       setLoading(false);
       return;
     }
-    
     loadFilms();
   }, [category]);
 
@@ -32,7 +31,6 @@ export default function FilmGrid({
     try {
       setLoading(true);
       setError(null);
-
       let response;
       switch (category) {
         case 'top-rated':
@@ -47,7 +45,6 @@ export default function FilmGrid({
         default:
           response = await filmsAPI.getPopularMovies(page);
       }
-
       setFilms(prev => page === 1 ? response.results : [...prev, ...response.results]);
       setHasMore(page < response.total_pages);
     } catch (err) {
@@ -64,11 +61,18 @@ export default function FilmGrid({
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <p className="text-red-600 text-lg">{error}</p>
+      <div className="text-center py-16">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl
+          bg-[hsl(var(--danger)/0.1)] text-[hsl(var(--danger))] mb-4">
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+        </div>
+        <p className="text-[hsl(var(--fg-muted))] text-lg mb-4">{error}</p>
         <button 
           onClick={() => loadFilms()} 
-          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="px-6 py-2.5 bg-[hsl(var(--accent))] text-[hsl(var(--accent-fg))] rounded-xl font-medium
+            hover:brightness-110 transition-all"
         >
           Réessayer
         </button>
@@ -78,24 +82,27 @@ export default function FilmGrid({
 
   return (
     <div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
         {films.map((film) => (
           <FilmCard key={film.id} film={film} />
         ))}
       </div>
 
       {loading && (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-600">Chargement...</p>
+        <div className="flex items-center justify-center gap-3 py-12">
+          <div className="w-5 h-5 border-2 border-[hsl(var(--primary))] border-t-transparent rounded-full animate-spin" />
+          <p className="text-[hsl(var(--fg-muted))]">Chargement...</p>
         </div>
       )}
 
       {!loading && hasMore && films.length > 0 && (
-        <div className="text-center mt-12">
+        <div className="text-center mt-10">
           <button
             onClick={loadMore}
-            className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-7 py-3 bg-[hsl(var(--bg-card))] text-[hsl(var(--fg))]
+              border border-[hsl(var(--border))] rounded-xl font-medium
+              hover:bg-[hsl(var(--bg-card-hover))] hover:border-[hsl(var(--border-hover))]
+              transition-all"
           >
             Charger plus de films
           </button>
@@ -103,8 +110,9 @@ export default function FilmGrid({
       )}
 
       {!loading && films.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-600 text-lg">Aucun film trouvé</p>
+        <div className="text-center py-16">
+          <div className="text-4xl mb-4">🎬</div>
+          <p className="text-[hsl(var(--fg-muted))] text-lg">Aucun film trouvé</p>
         </div>
       )}
     </div>

@@ -1,152 +1,211 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Seat, SeatMap, MovieSession } from '@/lib/types/session';
-import { reservationAPI } from '@/lib/api/reservation';
-import { useAuth } from '@/context/AuthContext';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Seance } from '@/lib/types/seance';
+import { seancesAPI } from '@/lib/api/seances';
 
 interface SeatSelectorProps {
-  sessionId: number;
+  seanceId: number;
   movieId: number;
 }
 
-export default function SeatSelector({ sessionId, movieId }: SeatSelectorProps) {
-  const [seatMap, setSeatMap] = useState<SeatMap | null>(null);
-  const [session, setSession] = useState<MovieSession | null>(null);
-  const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<'seats' | 'confirmation'>('seats');
-  const router = useRouter();
-  const { user, accessToken } = useAuth();
+/* ── Types pour la grille ── */
+type SeatStatus = 'available' | 'taken' | 'selected';
+interface Seat {
+  row: string;
+  number: number;
+  status: SeatStatus;
+}
 
+export default function SeatSelector({ seanceId, movieId }: SeatSelectorProps) {
+  const [seance, setSeance] = useState<Seance | null>(null);
+  const [selectedSeats, setSelectedSeats] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [reserving, setReserving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const movieTitle = searchParams.get('movieTitle') || 'Film';
+
+  const MAX_SEATS = 10;
+  const PRICE_PER_SEAT = 9.99;
+
+  // Charger la séance
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchSeance = async () => {
       try {
         setLoading(true);
         setError(null);
-
-        // Utiliser les données mock pour le développement
-        const [seatMapData, sessionData] = await Promise.all([
-          reservationAPI.getMockSeatMap(sessionId),
-          reservationAPI.getMockSessions(movieId).then(response => {
-            return response.sessions.find(s => s.id === sessionId) || null;
-          })
-        ]);
-
-        setSeatMap(seatMapData);
-        setSession(sessionData);
+        const seances = await seancesAPI.getSeancesByFilm(movieId);
+        const found = seances.find((s) => s.id === seanceId);
+        if (!found) throw new Error('Séance introuvable');
+        setSeance(found);
       } catch (err) {
-        const error = err as Error;
-        setError(error.message || 'Erreur lors du chargement des données de réservation');
-        console.error('Erreur chargement données réservation:', err);
+        setError((err as Error).message || 'Erreur lors du chargement');
       } finally {
         setLoading(false);
       }
     };
+    fetchSeance();
+  }, [seanceId, movieId]);
 
-    fetchData();
-  }, [sessionId, movieId]);
+  /* ── Générer la grille de sièges ── */
+  const seatGrid = useMemo(() => {
+    if (!seance) return [];
 
-  const toggleSeatSelection = (seat: Seat) => {
-    if (!seatMap || !session) return;
+    const total = seance.nombrePlacesTotal;
+    const taken = total - seance.nombrePlacesRestantes;
+    const seatsPerRow = total <= 60 ? 10 : total <= 100 ? 12 : 14;
+    const nbRows = Math.ceil(total / seatsPerRow);
+    const rowLetters = 'ABCDEFGHIJKLMNOP'.slice(0, nbRows);
 
-    // Ne pas permettre la sélection de sièges déjà réservés
-    if (seat.status === 'reserved' || seat.status === 'unavailable') return;
-
-    setSelectedSeats(prev => {
-      // Vérifier si le siège est déjà sélectionné
-      const isSelected = prev.some(s => s.id === seat.id);
-
-      if (isSelected) {
-        // Désélectionner le siège
-        return prev.filter(s => s.id !== seat.id);
-      } else {
-        // Sélectionner le siège
-        return [...prev, { ...seat, status: 'selected' as const }];
+    // Générer des sièges "pris" de façon déterministe (basé sur seanceId)
+    const takenSet = new Set<string>();
+    const seed = seanceId * 7 + total * 3;
+    let idx = 0;
+    while (takenSet.size < taken && idx < total * 3) {
+      const pseudoRand = ((seed + idx * 31) * 16807) % 2147483647;
+      const seatIdx = pseudoRand % total;
+      const r = Math.floor(seatIdx / seatsPerRow);
+      const s = (seatIdx % seatsPerRow) + 1;
+      if (r < nbRows) {
+        const actualRow = rowLetters[r];
+        const actualSeatsInRow = r === nbRows - 1
+          ? total - (nbRows - 1) * seatsPerRow
+          : seatsPerRow;
+        if (s <= actualSeatsInRow) {
+          takenSet.add(`${actualRow}${s}`);
+        }
       }
+      idx++;
+    }
+
+    const grid: Seat[][] = [];
+    for (let r = 0; r < nbRows; r++) {
+      const row: Seat[] = [];
+      const actualSeatsInRow = r === nbRows - 1
+        ? total - (nbRows - 1) * seatsPerRow
+        : seatsPerRow;
+      const rowLetter = rowLetters[r];
+      for (let s = 1; s <= actualSeatsInRow; s++) {
+        const id = `${rowLetter}${s}`;
+        row.push({
+          row: rowLetter,
+          number: s,
+          status: takenSet.has(id) ? 'taken' : 'available',
+        });
+      }
+      grid.push(row);
+    }
+    return grid;
+  }, [seance, seanceId]);
+
+  /* ── Handlers ── */
+  const toggleSeat = (row: string, number: number) => {
+    const id = `${row}${number}`;
+    setSelectedSeats((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else if (next.size < MAX_SEATS) {
+        next.add(id);
+      }
+      return next;
     });
   };
 
-  const getSeatStatus = (seatId: string): Seat['status'] => {
-    const selectedSeat = selectedSeats.find(s => s.id === seatId);
-    if (selectedSeat) return selectedSeat.status;
-    
-    const seat = seatMap?.seats.find(s => s.id === seatId);
-    return seat?.status || 'unavailable';
-  };
-
-  const calculateTotalPrice = () => {
-    return selectedSeats.reduce((total, seat) => total + (seat.price || 0), 0);
-  };
-
-  const handleContinue = () => {
-    if (selectedSeats.length === 0) {
-      setError('Veuillez sélectionner au moins un siège');
-      return;
-    }
-    setStep('confirmation');
-  };
-
-  const handleConfirmReservation = async () => {
+  const handleReserver = async () => {
+    if (!seance || selectedSeats.size < 1) return;
     try {
-      if (!session || !accessToken) return;
+      setReserving(true);
+      setError(null);
+      const nbPlaces = selectedSeats.size;
+      const seatsArray = Array.from(selectedSeats).sort();
 
-      // Préparer les données de réservation
-      const reservationData = {
-        sessionId: session.id,
-        seatIds: selectedSeats.map(seat => seat.id),
-        paymentMethod: 'cb', // Méthode de paiement par défaut
-        userData: {
-          email: user?.email || '',
-          firstName: user?.firstName || '',
-          lastName: user?.lastName || '',
-        },
-      };
+      // 1. Réserver les places dans le micro-service séances
+      await seancesAPI.reserverPlaces(seance.id, nbPlaces);
 
-      // En production, utiliser l'API réelle
-      // const response = await reservationAPI.createReservation(reservationData, accessToken);
+      // 2. Sauvegarder la réservation côté serveur (API Next.js)
+      const token = localStorage.getItem('accessToken');
+      let reference = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
 
-      // Pour le développement, simuler une réservation réussie
-      console.log('Réservation simulée:', reservationData);
+      if (token) {
+        try {
+          const res = await fetch('/api/reservations', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              seanceId: seance.id,
+              movieTitle,
+              salle: seance.numeroSalle,
+              horaire: seance.horaire,
+              nbPlaces,
+              seats: seatsArray,
+              total: nbPlaces * PRICE_PER_SEAT,
+            }),
+          });
+          if (res.ok) {
+            const saved = await res.json();
+            reference = saved.reference;
+          }
+        } catch {
+          // Pas critique si l'enregistrement échoue, la réservation séance est déjà faite
+        }
+      }
 
-      // Redirection vers la page de confirmation
-      router.push(`/reservations/confirmation?sessionId=${sessionId}&seats=${selectedSeats.length}`);
+      router.push(
+        `/reservations/confirmation?seanceId=${seance.id}&seats=${nbPlaces}&movieTitle=${encodeURIComponent(movieTitle)}&salle=${seance.numeroSalle}&horaire=${encodeURIComponent(seance.horaire)}&ref=${reference}&selectedSeats=${encodeURIComponent(seatsArray.join(','))}`
+      );
     } catch (err) {
-      const error = err as Error;
-      setError(error.message || 'Erreur lors de la création de la réservation');
-      console.error('Erreur réservation:', err);
+      setError((err as Error).message || 'Erreur lors de la réservation');
+      setReserving(false);
     }
   };
 
+  const formatTime = (iso: string) =>
+    new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+  const formatFullDate = (iso: string) =>
+    new Date(iso).toLocaleDateString('fr-FR', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    });
+
+  const getSeatColor = (seat: Seat) => {
+    const id = `${seat.row}${seat.number}`;
+    if (seat.status === 'taken')
+      return 'bg-[hsl(var(--fg-subtle)/0.3)] text-[hsl(var(--fg-subtle)/0.5)] cursor-not-allowed';
+    if (selectedSeats.has(id))
+      return 'bg-[hsl(var(--accent))] text-[hsl(var(--accent-fg))] shadow-md shadow-[hsl(var(--accent)/0.3)] scale-110';
+    return 'bg-[hsl(var(--bg-subtle))] text-[hsl(var(--fg-muted))] hover:bg-[hsl(var(--accent)/0.2)] hover:text-[hsl(var(--fg))] cursor-pointer';
+  };
+
+  /* ── Loading ── */
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Chargement des sièges...</p>
-        </div>
+      <div className="max-w-3xl mx-auto px-4 py-10 text-center">
+        <div className="w-10 h-10 mx-auto border-3 border-[hsl(var(--accent))] border-t-transparent rounded-full animate-spin" />
+        <p className="mt-4 text-sm text-[hsl(var(--fg-muted))]">Chargement de la séance…</p>
       </div>
     );
   }
 
-  if (error) {
+  /* ── Error ── */
+  if (error && !seance) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg max-w-2xl mx-auto">
-          <p className="text-red-700 mb-4">{error}</p>
-          <div className="flex gap-4">
-            <button
-              onClick={() => router.push('/films')}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-            >
-              Retour aux films
+      <div className="max-w-md mx-auto px-4 py-10">
+        <div className="rounded-2xl border border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.05)] p-6 text-center">
+          <p className="text-[hsl(var(--fg))] font-medium mb-4">{error}</p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => router.push('/films')}
+              className="px-4 py-2 bg-[hsl(var(--accent))] text-[hsl(var(--accent-fg))] rounded-xl text-sm font-medium hover:brightness-110 transition-all">
+              Films
             </button>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-            >
+            <button onClick={() => window.location.reload()}
+              className="px-4 py-2 rounded-xl text-sm font-medium bg-[hsl(var(--bg-subtle))] text-[hsl(var(--fg-muted))] hover:bg-[hsl(var(--bg-card-hover))] transition-colors">
               Réessayer
             </button>
           </div>
@@ -155,294 +214,157 @@ export default function SeatSelector({ sessionId, movieId }: SeatSelectorProps) 
     );
   }
 
-  if (!seatMap || !session) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg max-w-2xl mx-auto">
-          <p className="text-yellow-700 mb-4">
-            Impossible de charger les données de la séance. Veuillez vérifier que la séance existe.
+  if (!seance) return null;
+
+  const nbPlaces = selectedSeats.size;
+  const total = nbPlaces * PRICE_PER_SEAT;
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-10">
+      <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--bg-card))] overflow-hidden">
+
+        {/* Header */}
+        <div className="p-6 border-b border-[hsl(var(--border))]">
+          <h1 className="text-xl font-bold text-[hsl(var(--fg))] mb-1">Choisissez vos places</h1>
+          <p className="text-sm text-[hsl(var(--fg-muted))]">
+            {movieTitle} — Salle {seance.numeroSalle} — {formatFullDate(seance.horaire)} à {formatTime(seance.horaire)}
           </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+
+          {/* Écran */}
+          <div className="text-center">
+            <div className="mx-auto max-w-xs h-2 rounded-full bg-gradient-to-r from-transparent via-[hsl(var(--accent)/0.5)] to-transparent mb-1" />
+            <span className="text-[10px] uppercase tracking-widest text-[hsl(var(--fg-subtle))] font-medium">
+              Écran
+            </span>
+          </div>
+
+          {/* Grille de sièges */}
+          <div className="flex flex-col items-center gap-1.5 overflow-x-auto py-2">
+            {seatGrid.map((row, ri) => (
+              <div key={ri} className="flex items-center gap-1">
+                {/* Lettre de rangée */}
+                <span className="w-6 text-center text-xs font-bold text-[hsl(var(--fg-subtle))]">
+                  {row[0]?.row}
+                </span>
+
+                {/* Sièges */}
+                <div className="flex gap-1">
+                  {row.map((seat) => {
+                    const id = `${seat.row}${seat.number}`;
+                    return (
+                      <button
+                        key={id}
+                        disabled={seat.status === 'taken'}
+                        onClick={() => toggleSeat(seat.row, seat.number)}
+                        title={seat.status === 'taken' ? 'Occupé' : `${seat.row}${seat.number}`}
+                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-t-lg text-[10px] font-semibold
+                          transition-all duration-150 flex items-center justify-center
+                          ${getSeatColor(seat)}`}
+                      >
+                        {seat.number}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Lettre de rangée (droite) */}
+                <span className="w-6 text-center text-xs font-bold text-[hsl(var(--fg-subtle))]">
+                  {row[0]?.row}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Légende */}
+          <div className="flex justify-center gap-5 text-xs text-[hsl(var(--fg-muted))]">
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 rounded-t-md bg-[hsl(var(--bg-subtle))]" />
+              <span>Disponible</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 rounded-t-md bg-[hsl(var(--accent))]" />
+              <span>Sélectionné</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 rounded-t-md bg-[hsl(var(--fg-subtle)/0.3)]" />
+              <span>Occupé</span>
+            </div>
+          </div>
+
+          {/* Sièges sélectionnés */}
+          {nbPlaces > 0 && (
+            <div className="rounded-xl bg-[hsl(var(--accent)/0.08)] border border-[hsl(var(--accent)/0.2)] p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-[hsl(var(--fg))]">Places sélectionnées :</span>
+                {Array.from(selectedSeats).sort().map((s) => (
+                  <span key={s} className="px-2 py-0.5 rounded-md bg-[hsl(var(--accent))] text-[hsl(var(--accent-fg))] text-xs font-bold">
+                    {s}
+                  </span>
+                ))}
+              </div>
+              {nbPlaces >= MAX_SEATS && (
+                <p className="text-xs text-[hsl(var(--warning))] mt-2">
+                  Maximum {MAX_SEATS} places par réservation
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Récap prix */}
+          {nbPlaces > 0 && (
+            <div className="rounded-xl border border-[hsl(var(--border))] p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-[hsl(var(--fg-muted))]">{nbPlaces} × {PRICE_PER_SEAT.toFixed(2)} €</span>
+                <span className="text-[hsl(var(--fg))]">{total.toFixed(2)} €</span>
+              </div>
+              <div className="flex justify-between font-bold text-base pt-2 border-t border-[hsl(var(--border))]">
+                <span className="text-[hsl(var(--fg))]">Total</span>
+                <span className="text-[hsl(var(--accent))]">{total.toFixed(2)} €</span>
+              </div>
+            </div>
+          )}
+
+          {/* Erreur */}
+          {error && (
+            <div className="rounded-xl border border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.05)] p-3 text-center">
+              <p className="text-sm text-[hsl(var(--danger))]">{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 p-5 border-t border-[hsl(var(--border))] bg-[hsl(var(--bg-subtle))]">
           <button
-            onClick={() => router.push('/films')}
-            className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+            onClick={() => router.back()}
+            className="flex-1 py-3 rounded-xl font-medium text-sm
+              bg-[hsl(var(--bg-card))] text-[hsl(var(--fg-muted))] border border-[hsl(var(--border))]
+              hover:bg-[hsl(var(--bg-card-hover))] hover:text-[hsl(var(--fg))] transition-colors"
           >
-            Retour aux films
+            Retour
+          </button>
+          <button
+            onClick={handleReserver}
+            disabled={reserving || nbPlaces < 1}
+            className="flex-1 py-3 rounded-xl font-bold text-sm text-[hsl(var(--accent-fg))]
+              bg-[hsl(var(--accent))] hover:brightness-110 shadow-md shadow-[hsl(var(--accent)/0.3)]
+              transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {reserving ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-[hsl(var(--accent-fg))] border-t-transparent rounded-full animate-spin" />
+                Réservation…
+              </span>
+            ) : nbPlaces > 0 ? (
+              `Réserver ${nbPlaces} place${nbPlaces > 1 ? 's' : ''} — ${total.toFixed(2)} €`
+            ) : (
+              'Sélectionnez vos places'
+            )}
           </button>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="container mx-auto px-4 py-8">
-      {step === 'seats' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Informations de la séance */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden sticky top-4">
-              <div className="p-6">
-                <h1 className="text-2xl font-bold mb-2">{session.movie?.title || 'Film inconnu'}</h1>
-                
-                <div className="mt-4 space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Salle</span>
-                    <span className="font-medium">{session.room?.name || 'Inconnue'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Date</span>
-                    <span className="font-medium">
-                      {new Date(session.startTime).toLocaleDateString('fr-FR', {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Horaire</span>
-                    <span className="font-medium">
-                      {new Date(session.startTime).toLocaleTimeString('fr-FR', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })} - {new Date(session.endTime).toLocaleTimeString('fr-FR', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Format</span>
-                    <span className="font-medium">{session.format || 'Standard'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Langue</span>
-                    <span className="font-medium">{session.language || 'VF'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Légende des sièges */}
-              <div className="bg-gray-50 p-6 border-t">
-                <h2 className="text-lg font-semibold mb-4">Légende</h2>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-blue-600 rounded-sm"></div>
-                    <span className="text-sm">Sélectionné</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-green-600 rounded-sm"></div>
-                    <span className="text-sm">Disponible</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-red-600 rounded-sm"></div>
-                    <span className="text-sm">Réservé</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gray-300 rounded-sm"></div>
-                    <span className="text-sm">Indisponible</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-yellow-600 rounded-sm"></div>
-                    <span className="text-sm">Premium</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Résumé de la sélection */}
-              <div className="bg-white p-6 border-t">
-                <h2 className="text-lg font-semibold mb-4">Votre sélection</h2>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Sièges</span>
-                    <span className="font-medium">{selectedSeats.length} siège(s)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Prix total</span>
-                    <span className="font-bold text-blue-600">
-                      {calculateTotalPrice().toFixed(2)} €
-                    </span>
-                  </div>
-                  <button
-                    onClick={handleContinue}
-                    disabled={selectedSeats.length === 0}
-                    className={`w-full py-3 rounded-lg font-semibold transition-colors ${
-                      selectedSeats.length === 0
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                  >
-                    Continuer
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Carte des sièges */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold mb-4">Sélectionnez vos sièges</h2>
-              
-              {/* Écran */}
-              <div className="text-center mb-6">
-                <div className="bg-gray-800 text-white py-2 rounded-t-lg mx-auto w-32 text-sm">
-                  ÉCRAN
-                </div>
-              </div>
-
-              {/* Grille des sièges */}
-              <div className="overflow-x-auto">
-                <div className="inline-block min-w-full">
-                  {seatMap.rows.map((row) => (
-                    <div key={row} className="flex mb-2 justify-center">
-                      <div className="w-8 text-center font-medium text-gray-600 mr-2">{row}</div>
-                      {Array.from({ length: seatMap.seatsPerRow }, (_, i) => {
-                        const seatId = `${row}${i + 1}`;
-                        const status = getSeatStatus(seatId);
-                        const seat = seatMap.seats.find(s => s.id === seatId);
-                        
-                        return (
-                          <button
-                            key={seatId}
-                            onClick={() => toggleSeatSelection(seat!)}
-                            disabled={status === 'reserved' || status === 'unavailable'}
-                            className={`w-8 h-8 mx-1 rounded-sm flex items-center justify-center text-xs font-medium transition-colors ${
-                              status === 'selected' ? 'bg-blue-600 text-white' :
-                              status === 'available' ? 'bg-green-600 text-white hover:bg-green-700' :
-                              status === 'reserved' ? 'bg-red-600 text-white cursor-not-allowed' :
-                              'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            } ${
-                              seat?.type === 'premium' && status !== 'reserved' ? 'border-2 border-yellow-500' : ''
-                            }`}
-                          >
-                            {i + 1}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Numéros des sièges */}
-              <div className="flex justify-center mt-4">
-                <div className="w-8 mr-2"></div>
-                {Array.from({ length: seatMap.seatsPerRow }, (_, i) => (
-                  <div key={i} className="w-8 h-8 mx-1 flex items-center justify-center text-xs text-gray-500">
-                    {i + 1}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* Étape de confirmation */
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h1 className="text-2xl font-bold mb-6">Confirmez votre réservation</h1>
-
-            {/* Résumé de la réservation */}
-            <div className="space-y-4 mb-6">
-              <div>
-                <h2 className="text-lg font-semibold mb-3">Film</h2>
-                <div className="flex items-center gap-4">
-                  {session.movie?.poster && (
-                    <img
-                      src={session.movie.poster}
-                      alt={session.movie.title}
-                      className="w-16 h-24 object-cover rounded"
-                    />
-                  )}
-                  <div>
-                    <p className="font-medium">{session.movie?.title}</p>
-                    <p className="text-sm text-gray-600">
-                      {session.format} • {session.language} • {session.movie?.duration} min
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h2 className="text-lg font-semibold mb-3">Séance</h2>
-                <p className="text-gray-700">
-                  {new Date(session.startTime).toLocaleDateString('fr-FR', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })} à {new Date(session.startTime).toLocaleTimeString('fr-FR', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </p>
-                <p className="text-gray-600 text-sm">
-                  {session.room?.name} • {session.room?.features?.join(', ')}
-                </p>
-              </div>
-
-              <div>
-                <h2 className="text-lg font-semibold mb-3">Sièges</h2>
-                <div className="flex flex-wrap gap-2">
-                  {selectedSeats.map((seat) => (
-                    <span
-                      key={seat.id}
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        seat.type === 'premium' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
-                      }`}
-                    >
-                      {seat.row}{seat.number}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h2 className="text-lg font-semibold mb-3">Prix</h2>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Sièges standard</span>
-                    <span className="font-medium">
-                      {selectedSeats.filter(seat => seat.type !== 'premium').length} × 
-                      {selectedSeats.find(seat => seat.type !== 'premium')?.price?.toFixed(2) || '12.99'} €
-                    </span>
-                  </div>
-                  {selectedSeats.some(seat => seat.type === 'premium') && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Sièges premium</span>
-                      <span className="font-medium">
-                        {selectedSeats.filter(seat => seat.type === 'premium').length} × 
-                        {selectedSeats.find(seat => seat.type === 'premium')?.price?.toFixed(2) || '18.99'} €
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
-                    <span>Total</span>
-                    <span className="text-blue-600">{calculateTotalPrice().toFixed(2)} €</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Boutons d'action */}
-            <div className="flex gap-4">
-              <button
-                onClick={() => setStep('seats')}
-                className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                Retour
-              </button>
-              <button
-                onClick={handleConfirmReservation}
-                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-              >
-                Confirmer la réservation
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

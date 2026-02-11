@@ -1,51 +1,47 @@
 import PrivateRoute from '@/components/auth/PrivateRoute';
 import SeatSelector from '@/components/reservations/SeatSelector';
+import Link from 'next/link';
 
 export const metadata = {
-  title: 'Sélection des sièges - CineApp',
-  description: 'Sélectionnez vos sièges pour la séance',
+  title: 'Réservation - CineApp',
+  description: 'Réservez vos places pour la séance',
 };
 
 interface ReservationDetailsPageProps {
-  params: {
-    id: string;
-  };
-  searchParams: {
-    movieId?: string;
-  };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ movieId?: string; movieTitle?: string }>;
 }
 
-function ReservationDetailsContent({ params, searchParams }: ReservationDetailsPageProps) {
-  const sessionId = parseInt(params.id);
-  const movieId = searchParams.movieId ? parseInt(searchParams.movieId) : null;
+async function ReservationDetailsContent({ params, searchParams }: ReservationDetailsPageProps) {
+  const { id } = await params;
+  const { movieId: movieIdParam } = await searchParams;
 
-  if (isNaN(sessionId) || !movieId) {
+  const seanceId = parseInt(id);
+  const movieId = movieIdParam ? parseInt(movieIdParam) : null;
+
+  if (isNaN(seanceId) || !movieId) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg max-w-2xl mx-auto">
-          <p className="text-red-700 mb-4">
-            Paramètres de réservation invalides. Veuillez sélectionner un film et une séance valides.
+      <div className="max-w-md mx-auto px-4 py-10">
+        <div className="rounded-2xl border border-[hsl(var(--danger)/0.3)] bg-[hsl(var(--danger)/0.05)] p-6 text-center">
+          <p className="text-[hsl(var(--fg))] font-medium mb-4">
+            Paramètres de réservation invalides.
           </p>
-          <a
-            href="/films"
-            className="inline-block px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-          >
+          <Link href="/films"
+            className="inline-flex px-5 py-2.5 bg-[hsl(var(--accent))] text-[hsl(var(--accent-fg))] rounded-xl font-medium hover:brightness-110 transition-all">
             Retour aux films
-          </a>
+          </Link>
         </div>
       </div>
     );
   }
 
-  return (
-    <SeatSelector sessionId={sessionId} movieId={movieId} />
-  );
+  return <SeatSelector seanceId={seanceId} movieId={movieId} />;
 }
 
-export default function ReservationDetailsPage({ params, searchParams }: ReservationDetailsPageProps) {
+export default function ReservationDetailsPage(props: ReservationDetailsPageProps) {
   return (
     <PrivateRoute>
-      <ReservationDetailsContent params={params} searchParams={searchParams} />
+      <ReservationDetailsContent {...props} />
     </PrivateRoute>
   );
 }

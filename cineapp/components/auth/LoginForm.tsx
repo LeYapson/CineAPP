@@ -3,22 +3,19 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import Link from 'next/link';
 
 export default function LoginForm() {
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-  });
+  const [formData, setFormData] = useState({ username: '', password: '' });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-
-  const { login, error: authError } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,10 +23,7 @@ export default function LoginForm() {
     setError(null);
 
     try {
-      // Utilisation du contexte d'authentification
       await login(formData.username, formData.password);
-      
-      // Redirection après la page de login si nécessaire
       const redirectPath = localStorage.getItem('redirectAfterLogin');
       if (redirectPath) {
         localStorage.removeItem('redirectAfterLogin');
@@ -40,74 +34,97 @@ export default function LoginForm() {
     } catch (err) {
       const error = err as Error;
       setError(error.message || 'Identifiants incorrects. Veuillez réessayer.');
-      console.error('Erreur de connexion:', err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-      <input type="hidden" name="remember" value="true" />
-      <div className="rounded-md shadow-sm -space-y-px">
-        <div>
-          <label htmlFor="username" className="sr-only">
-            Nom d'utilisateur
-          </label>
-          <input
-            id="username"
-            name="username"
-            type="text"
-            autoComplete="username"
-            required
-            className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-            placeholder="Nom d'utilisateur"
-            value={formData.username}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <label htmlFor="password" className="sr-only">
-            Mot de passe
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-            placeholder="Mot de passe"
-            value={formData.password}
-            onChange={handleChange}
-          />
-        </div>
+    <form className="space-y-5" onSubmit={handleSubmit}>
+      {/* Username */}
+      <div>
+        <label htmlFor="username" className="block text-sm font-medium text-[hsl(var(--fg))] mb-1.5">
+          Nom d&apos;utilisateur
+        </label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          autoComplete="username"
+          required
+          className="w-full px-4 py-3 rounded-xl border border-[hsl(var(--border))]
+            bg-[hsl(var(--input-bg))] text-[hsl(var(--fg))] placeholder:text-[hsl(var(--fg-subtle))]
+            focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:border-transparent
+            transition-shadow text-sm"
+          placeholder="votre_pseudo"
+          value={formData.username}
+          onChange={handleChange}
+        />
       </div>
 
+      {/* Password */}
+      <div>
+        <label htmlFor="password" className="block text-sm font-medium text-[hsl(var(--fg))] mb-1.5">
+          Mot de passe
+        </label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+          className="w-full px-4 py-3 rounded-xl border border-[hsl(var(--border))]
+            bg-[hsl(var(--input-bg))] text-[hsl(var(--fg))] placeholder:text-[hsl(var(--fg-subtle))]
+            focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:border-transparent
+            transition-shadow text-sm"
+          placeholder="••••••••"
+          value={formData.password}
+          onChange={handleChange}
+        />
+      </div>
+
+      {/* Error */}
       {error && (
-        <div className="text-red-600 text-sm text-center">
-          {error}
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-[hsl(var(--danger)/0.08)]
+          border border-[hsl(var(--danger)/0.2)] text-[hsl(var(--danger))] text-sm">
+          <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+          <span>
+            {error.includes('Invalid credentials') || error.includes('Identifiants incorrects')
+              ? 'Nom d\'utilisateur ou mot de passe incorrect.'
+              : error.includes('réseau') || error.includes('serveur')
+              ? 'Problème de connexion au serveur.'
+              : error}
+          </span>
         </div>
       )}
 
-      <div>
-        <button
-          type="submit"
-          disabled={loading}
-          className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          {loading ? 'Connexion en cours...' : 'Se connecter'}
-        </button>
-      </div>
+      {/* Submit */}
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full py-3 rounded-xl font-semibold text-sm text-[hsl(var(--accent-fg))]
+          bg-[hsl(var(--accent))] hover:brightness-110 transition-all
+          disabled:opacity-50 disabled:cursor-not-allowed
+          focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:ring-offset-2
+          focus:ring-offset-[hsl(var(--bg-card))]"
+      >
+        {loading ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="w-4 h-4 border-2 border-[hsl(var(--accent-fg)/0.3)] border-t-[hsl(var(--accent-fg))] rounded-full animate-spin" />
+            Connexion…
+          </span>
+        ) : 'Se connecter'}
+      </button>
 
-      <div className="text-center text-sm">
-        <p className="text-gray-600">
-          Vous n'avez pas de compte?{' '}
-          <a href="/register" className="font-medium text-blue-600 hover:text-blue-500">
-            S'inscrire
-          </a>
-        </p>
-      </div>
+      {/* Link */}
+      <p className="text-center text-sm text-[hsl(var(--fg-muted))]">
+        Pas encore de compte ?{' '}
+        <Link href="/register" className="font-medium text-[hsl(var(--accent))] hover:underline">
+          S&apos;inscrire
+        </Link>
+      </p>
     </form>
   );
 }

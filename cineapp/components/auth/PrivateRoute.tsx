@@ -9,9 +9,7 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
   const router = useRouter();
 
   useEffect(() => {
-    // Si le chargement est terminé et qu'il n'y a pas d'utilisateur, rediriger
     if (!loading && !user) {
-      // Stocker la page actuelle pour la redirection après connexion
       const currentPath = window.location.pathname;
       if (currentPath !== '/login') {
         localStorage.setItem('redirectAfterLogin', currentPath);
@@ -20,41 +18,37 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
     }
   }, [user, loading, router]);
 
-  // Afficher un loader pendant le chargement
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-10 h-10 border-3 border-[hsl(var(--accent))] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  // Afficher une erreur si nécessaire
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-md">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <span className="text-red-500 text-2xl">⚠️</span>
-            </div>
-            <div className="ml-3">
-              <p className="text-red-700 font-medium">
-                {error}
-              </p>
-              <button
-                onClick={() => router.push('/login')}
-                className="mt-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-              >
-                Se connecter
-              </button>
-            </div>
+      <div className="min-h-[60vh] flex items-center justify-center p-4">
+        <div className="max-w-sm w-full rounded-2xl border border-[hsl(var(--danger)/0.3)]
+          bg-[hsl(var(--danger)/0.05)] p-6 text-center">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-[hsl(var(--danger)/0.1)]
+            flex items-center justify-center text-[hsl(var(--danger))]">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
           </div>
+          <p className="text-[hsl(var(--fg))] font-medium mb-4">{error}</p>
+          <button
+            onClick={() => router.push('/login')}
+            className="px-5 py-2.5 bg-[hsl(var(--accent))] text-[hsl(var(--accent-fg))] rounded-xl font-medium
+              hover:brightness-110 transition-all"
+          >
+            Se connecter
+          </button>
         </div>
       </div>
     );
   }
 
-  // Si tout est bon, afficher les enfants
   return <>{children}</>;
 }
