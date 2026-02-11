@@ -92,7 +92,11 @@ class FilmsAPI {
   }
 
   private async fetchAPI<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
-    const url = new URL(`${this.baseURL}${endpoint}`);
+    const fullPath = `${this.baseURL}${endpoint}`;
+    // Sur le client, baseURL est un chemin relatif (/proxy-films) → utiliser l'origin du navigateur
+    const url = typeof window !== 'undefined'
+      ? new URL(fullPath, window.location.origin)
+      : new URL(fullPath);
     
     console.log(`Appel API Films: ${url.toString()}`);
     
